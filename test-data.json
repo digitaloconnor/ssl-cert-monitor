@@ -1,0 +1,59 @@
+{
+  "description": "Sample ssl-checker.io API responses for testing Process SSL Result node without live credentials.",
+  "test_cases": [
+    {
+      "_id": "critical_invalid_cert",
+      "_description": "Certificate is invalid. Expected: alertLevel=CRITICAL, needsAlert=true.",
+      "_expected": "CRITICAL alert sent to Slack",
+      "host": "expired.badssl.com",
+      "result": {
+        "cert_valid": "false",
+        "days_until_expiry": "0",
+        "cert_exp_date": "2020-01-01"
+      }
+    },
+    {
+      "_id": "critical_expiring_soon",
+      "_description": "Certificate valid but expires in 5 days. Expected: alertLevel=CRITICAL, needsAlert=true.",
+      "_expected": "CRITICAL alert sent to Slack",
+      "host": "almostexpired.example.com",
+      "result": {
+        "cert_valid": "true",
+        "days_until_expiry": "5",
+        "cert_exp_date": "2026-04-26"
+      }
+    },
+    {
+      "_id": "warning_expiring_soon",
+      "_description": "Certificate valid but expires in 25 days. Expected: alertLevel=WARNING, needsAlert=true.",
+      "_expected": "WARNING alert sent to Slack",
+      "host": "expiringsoon.example.com",
+      "result": {
+        "cert_valid": "true",
+        "days_until_expiry": "25",
+        "cert_exp_date": "2026-05-16"
+      }
+    },
+    {
+      "_id": "ok_healthy_cert",
+      "_description": "Certificate valid with 180 days remaining. Expected: alertLevel=OK, needsAlert=false.",
+      "_expected": "No Slack alert. Logged only.",
+      "host": "healthy.example.com",
+      "result": {
+        "cert_valid": "true",
+        "days_until_expiry": "180",
+        "cert_exp_date": "2026-10-18"
+      }
+    }
+  ],
+  "excel_format_example": {
+    "description": "Expected column structure in the OneDrive Excel file",
+    "columns": ["Domain"],
+    "sample_rows": [
+      ["example.com"],
+      ["api.example.com"],
+      ["shop.example.com"]
+    ],
+    "note": "Domain values must be plain domain names — no https://, no trailing slashes"
+  }
+}
