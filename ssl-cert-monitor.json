@@ -1,5 +1,5 @@
 {
-  "name": "OneDrive - SSL Certificate Monitor V1.0",
+  "name": "Monitor SSL certificate expiry and alert via Slack",
   "nodes": [
     {
       "parameters": {
@@ -20,7 +20,7 @@
     {
       "parameters": {
         "resource": "folder",
-        "folderId": "01ETF5LI325KEXBYWG3ZAJCAAVYRO3KWNO"
+        "folderId": "YOUR_ONEDRIVE_FOLDER_ID"
       },
       "type": "n8n-nodes-base.microsoftOneDrive",
       "typeVersion": 1,
@@ -42,7 +42,7 @@
     {
       "parameters": {
         "operation": "download",
-        "fileId": "01ETF5LI325KEXBYWG3ZAJCAAVYRO3KWNO"
+        "fileId": "YOUR_ONEDRIVE_FILE_ID"
       },
       "id": "fb111fbf-0b74-4721-b3e0-9492c7b2134b",
       "name": "Read Excel from OneDrive",
@@ -77,7 +77,7 @@
     },
     {
       "parameters": {
-        "url": "=https://ssl-checker.io/api/v1/check/{{ $json['﻿Domain'] }}",
+        "url": "=https://ssl-checker.io/api/v1/check/{{ $json['\ufeffDomain'] }}",
         "options": {
           "timeout": 30000
         }
@@ -85,7 +85,7 @@
       "id": "96f21bfa-8457-484b-9795-e33374aae4cb",
       "name": "Check SSL Certificate",
       "type": "n8n-nodes-base.httpRequest",
-      "position": [1136, 352],
+      "position": [1104, 592],
       "typeVersion": 4.2,
       "onError": "continueRegularOutput"
     },
@@ -96,7 +96,7 @@
       "id": "a9b1c2d3-e4f5-4a6b-8c7d-9e0f1a2b3c4d",
       "name": "Process SSL Result",
       "type": "n8n-nodes-base.code",
-      "position": [1250, 496],
+      "position": [1296, 592],
       "typeVersion": 2,
       "onError": "continueRegularOutput"
     },
@@ -127,7 +127,7 @@
       "id": "414ef3f3-998a-4857-9a9a-20823b161e53",
       "name": "Needs Alert?",
       "type": "n8n-nodes-base.if",
-      "position": [1460, 496],
+      "position": [1472, 592],
       "typeVersion": 2.2
     },
     {
@@ -135,9 +135,8 @@
         "select": "channel",
         "channelId": {
           "__rl": true,
-          "value": "C09GNAN8LF8",
-          "mode": "list",
-          "cachedResultName": "n8n-testing-space"
+          "value": "YOUR_SLACK_CHANNEL_ID",
+          "mode": "id"
         },
         "text": "SSL Certificate Alert\n\nWebsite: {{ $json.originalUrl }}\nDomain: {{ $json.domain }}\nAlert Level: {{ $json.alertLevel }}\nMessage: {{ $json.alertMessage }}\nDays Left: {{ $json.daysLeft }}\nValid: {{ $json.certValid }}\nCheck Date: {{ $json.checkDate }}\n\nPlease take appropriate action to renew the SSL certificate if needed.",
         "otherOptions": {
@@ -147,7 +146,7 @@
       "id": "97c4979b-fe81-49f3-bdc7-7b3a121fc549",
       "name": "Send Slack Alert",
       "type": "n8n-nodes-base.slack",
-      "position": [1680, 352],
+      "position": [1680, 400],
       "typeVersion": 2.3,
       "webhookId": "f461c296-bec9-45a8-9bf3-a59a36391d2b",
       "onError": "continueRegularOutput"
@@ -159,7 +158,7 @@
       "id": "4d3cfcd2-616b-4aef-b4fc-5b24faa07550",
       "name": "Log Results",
       "type": "n8n-nodes-base.code",
-      "position": [1680, 640],
+      "position": [1744, 608],
       "typeVersion": 2,
       "onError": "continueRegularOutput"
     },
@@ -169,132 +168,226 @@
       },
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1900, 496],
+      "position": [1936, 608],
       "id": "2bfd6e5d-2e4a-4d3c-b050-3e8be8fee3bb",
       "name": "Continue Domain Loop"
     },
     {
       "parameters": {
-        "content": "## Workflow Overview\n\n**Purpose:** Automatically monitor SSL certificates for websites stored in an Excel file on OneDrive\n\n**Features:**\n- Reads website URLs from OneDrive Excel file\n- Checks SSL certificates using SSL-Checker.io (free)\n- Sends Slack alerts for expiring certificates\n- Runs daily at 9:00 AM\n\n**Alert Levels:**\n- 🚨 Critical: Invalid cert or expires in ≤7 days\n- ⚠️ Warning: Expires in ≤30 days\n- ℹ️ Notice: Expires in ≤60 days\n- ✅ OK: Expires in >60 days",
-        "height": 424,
-        "width": 400,
-        "color": 6
+        "content": "## Monitor SSL certificate expiry and alert via Slack\n\n**Who's it for:** DevOps and security teams managing multiple websites who want automated SSL certificate monitoring without paying for a SaaS tool.\n\n**How it works:**\n1. Runs daily at 9 AM\n2. Reads a list of domains from an Excel file stored in OneDrive\n3. Checks each domain's SSL certificate via ssl-checker.io (free API)\n4. Sends a Slack alert for any certificate expiring in \u226430 days or already invalid\n\n**Alert thresholds:**\n- CRITICAL: invalid cert or \u22647 days remaining\n- WARNING: \u226430 days remaining\n- NOTICE: \u226460 days (logged, no Slack alert)\n\n**Requirements:**\n- Microsoft OneDrive OAuth2 credential\n- Slack OAuth2 credential\n\n**How to set up:**\n1. Create an Excel file with a column header `Domain` and one domain per row (e.g. `example.com` \u2014 no `https://`)\n2. Upload to OneDrive and copy the folder ID and file ID\n3. Paste the folder ID into `Get items in Security folder` and the file ID into `Read Excel from OneDrive`\n4. Set your Slack channel in `Send Slack Alert`",
+        "height": 500,
+        "width": 496,
+        "color": 3
       },
       "id": "618e745f-f461-49ba-b51e-49ace65d5406",
       "name": "Workflow Overview",
       "type": "n8n-nodes-base.stickyNote",
-      "position": [0, 0],
+      "position": [528, -192],
       "typeVersion": 1
     },
     {
       "parameters": {
-        "content": "## Setup Instructions\n\n1. **OneDrive Excel File:**\n   - Create Excel file with domains in column A (header: Domain)\n   - Upload to the Security folder\n   - Update the folder ID in 'Get items in Security folder'\n\n2. **Credentials Required:**\n   - Microsoft OneDrive OAuth2\n   - Slack OAuth2 for notifications\n\n3. **Excel Format:**\n   - Column A header: Domain\n   - Values: domain only (e.g., example.com — no https://)\n\n4. **Customisation:**\n   - Adjust alert thresholds in 'Process SSL Result' node\n   - Modify Slack message template in 'Send Slack Alert'\n   - Change schedule in 'Daily SSL Check'",
-        "height": 300,
-        "width": 400,
+        "content": "## Setup Instructions\n\n1. **OneDrive Excel File:**\n   - Create an Excel file with domains in column A (header: `Domain`)\n   - Upload to your chosen OneDrive folder\n   - Copy the folder ID and paste it into `Get items in Security folder`\n   - Copy the file ID and paste it into `Read Excel from OneDrive`\n\n2. **Credentials Required:**\n   - Microsoft OneDrive OAuth2\n   - Slack OAuth2 for notifications\n\n3. **Excel Format:**\n   - Column A header: `Domain`\n   - Values: domain only (e.g., `example.com` \u2014 no `https://`)\n\n4. **Customisation:**\n   - Adjust alert thresholds in `Process SSL Result` node\n   - Modify Slack message template in `Send Slack Alert`\n   - Change schedule in `Daily SSL Check`",
+        "height": 460,
+        "width": 496,
         "color": 7
       },
       "id": "6edb02d5-b7cc-4aa3-af30-0e7c056593ca",
       "name": "Setup Instructions",
       "type": "n8n-nodes-base.stickyNote",
-      "position": [112, 704],
+      "position": [1040, -192],
       "typeVersion": 1
     },
     {
+      "parameters": {
+        "content": "## 1. Data Source\n\nReads the Security folder from OneDrive, downloads all files, extracts the Excel data. Each row = one domain to check. OneDrive OAuth2 credential required.",
+        "height": 592,
+        "width": 832,
+        "color": 4
+      },
       "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
       "name": "Sticky Note - Data Source",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-208, 280],
-      "parameters": {
-        "content": "## 1. Data Source\n\nReads the Security folder from OneDrive, downloads all files, extracts the Excel data. Each row = one domain to check. OneDrive OAuth2 credential required.",
-        "height": 160,
-        "width": 560,
-        "color": 4
-      }
+      "position": [-32, 288]
     },
     {
+      "parameters": {
+        "content": "## 2. SSL Check Loop\n\nIterates over domains one at a time. Calls ssl-checker.io for each. Process SSL Result evaluates the response and sets needsAlert, alertLevel, and daysLeft fields used by the filter.",
+        "height": 592,
+        "width": 612,
+        "color": 4
+      },
       "id": "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f",
       "name": "Sticky Note - SSL Check",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [912, 140],
-      "parameters": {
-        "content": "## 2. SSL Check Loop\n\nIterates over domains one at a time. Calls ssl-checker.io for each. Process SSL Result evaluates the response and sets needsAlert, alertLevel, and daysLeft fields used by the filter.",
-        "height": 160,
-        "width": 580,
-        "color": 4
-      }
+      "position": [816, 288]
     },
     {
+      "parameters": {
+        "content": "## 3. Alert & Continue\n\nCRITICAL or WARNING \u2192 Slack alert. All results logged to execution console. Loop continues to next domain.",
+        "height": 592,
+        "width": 656,
+        "color": 4
+      },
       "id": "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a",
       "name": "Sticky Note - Alert",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [1460, 140],
-      "parameters": {
-        "content": "## 3. Alert & Continue\n\nCRITICAL or WARNING → Slack alert. All results logged to execution console (console.log only — not queryable). Loop continues to next domain.",
-        "height": 160,
-        "width": 480,
-        "color": 4
-      }
+      "position": [1440, 288]
     }
   ],
   "pinData": {},
   "connections": {
     "Daily SSL Check": {
-      "main": [[{"node": "Get items in Security folder", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Get items in Security folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get items in Security folder": {
-      "main": [[{"node": "Download all files", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Download all files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Download all files": {
-      "main": [[{"node": "Read Excel from OneDrive", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Read Excel from OneDrive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Excel from OneDrive": {
-      "main": [[{"node": "Extract Excel Data", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Extract Excel Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Extract Excel Data": {
-      "main": [[{"node": "Loop Over Domains", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Loop Over Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Loop Over Domains": {
       "main": [
         [],
-        [{"node": "Check SSL Certificate", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Check SSL Certificate",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Check SSL Certificate": {
-      "main": [[{"node": "Process SSL Result", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Process SSL Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Process SSL Result": {
-      "main": [[{"node": "Needs Alert?", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Needs Alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Needs Alert?": {
       "main": [
-        [{"node": "Send Slack Alert", "type": "main", "index": 0}],
-        [{"node": "Log Results", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Send Slack Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Send Slack Alert": {
-      "main": [[{"node": "Log Results", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log Results": {
-      "main": [[{"node": "Continue Domain Loop", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Continue Domain Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Continue Domain Loop": {
       "main": [
         [],
-        [{"node": "Loop Over Domains", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Loop Over Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
   "active": false,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate"
   },
-  "versionId": "51986bb8-4119-4059-8013-e03d51021eba",
-  "meta": {
-    "instanceId": "956b0642caa17694415befab574421a5ea4e33d80484849229d4837d84bb9058"
-  },
-  "id": "jJbBOkGRGhbIgDRw",
+  "versionId": "2c239633-6568-4a74-8192-ff4e250db69d",
+  "meta": null,
   "tags": []
 }
