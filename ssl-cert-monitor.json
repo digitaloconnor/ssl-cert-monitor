@@ -1,0 +1,450 @@
+{
+  "name": "OneDrive - SSL Certificate Monitor V1.0",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "9a1d0d9d-6ebd-403d-8fff-21bc6c977217",
+      "name": "Daily SSL Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -208,
+        496
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "folderId": "01ETF5LI325KEXBYWG3ZAJCAAVYRO3KWNO"
+      },
+      "type": "n8n-nodes-base.microsoftOneDrive",
+      "typeVersion": 1,
+      "position": [
+        16,
+        496
+      ],
+      "id": "65f19871-81fa-452a-868e-dfc1935b78a5",
+      "name": "Get items in Security folder"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.microsoftOneDrive",
+      "typeVersion": 1,
+      "position": [
+        240,
+        496
+      ],
+      "id": "dccf87a0-4033-41b3-95ed-cbeab03ee6b5",
+      "name": "Download all files"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": "01ETF5LI325KEXBYWG3ZAJCAAVYRO3KWNO"
+      },
+      "id": "fb111fbf-0b74-4721-b3e0-9492c7b2134b",
+      "name": "Read Excel from OneDrive",
+      "type": "n8n-nodes-base.microsoftOneDrive",
+      "position": [
+        464,
+        496
+      ],
+      "typeVersion": 1,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {
+          "headerRow": false,
+          "includeEmptyCells": false,
+          "rawData": true
+        }
+      },
+      "id": "953d7c07-2346-4775-b125-5af60cc56225",
+      "name": "Extract Excel Data",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        688,
+        496
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        912,
+        496
+      ],
+      "id": "40e3680b-a746-4ded-a7a0-905ce6a7f652",
+      "name": "Loop Over Domains"
+    },
+    {
+      "parameters": {
+        "url": "=https://ssl-checker.io/api/v1/check/{{ $json['﻿Domain'] }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "96f21bfa-8457-484b-9795-e33374aae4cb",
+      "name": "Check SSL Certificate",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1104,
+        592
+      ],
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evaluate SSL-Checker.io response and set alert fields\nconst item = $input.first();\nconst result = item.json;\n\nconst certValid = result.result?.cert_valid === 'true' || result.result?.cert_valid === true;\nconst daysLeft = parseInt(result.result?.days_until_expiry ?? result.result?.cert_exp_days ?? '999', 10);\nconst domain = result.host || result.domain || '';\nconst originalUrl = result.host || domain;\nconst checkDate = new Date().toISOString().split('T')[0];\n\nlet alertLevel = 'OK';\nlet needsAlert = false;\nlet alertMessage = '';\n\nif (!certValid) {\n  alertLevel = 'CRITICAL';\n  needsAlert = true;\n  alertMessage = 'Certificate is invalid or could not be verified.';\n} else if (daysLeft <= 7) {\n  alertLevel = 'CRITICAL';\n  needsAlert = true;\n  alertMessage = `Certificate expires in ${daysLeft} day(s). Immediate renewal required.`;\n} else if (daysLeft <= 30) {\n  alertLevel = 'WARNING';\n  needsAlert = true;\n  alertMessage = `Certificate expires in ${daysLeft} day(s). Schedule renewal soon.`;\n} else if (daysLeft <= 60) {\n  alertLevel = 'NOTICE';\n  needsAlert = false;\n  alertMessage = `Certificate expires in ${daysLeft} day(s). No immediate action needed.`;\n} else {\n  alertLevel = 'OK';\n  needsAlert = false;\n  alertMessage = `Certificate valid for ${daysLeft} more day(s).`;\n}\n\nreturn [{\n  json: {\n    domain,\n    originalUrl,\n    certValid,\n    daysLeft,\n    alertLevel,\n    alertMessage,\n    needsAlert,\n    checkDate,\n    result: result.result || {}\n  }\n}];"
+      },
+      "id": "a9b1c2d3-e4f5-4a6b-8c7d-9e0f1a2b3c4d",
+      "name": "Process SSL Result",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1296,
+        592
+      ],
+      "typeVersion": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "alert-condition",
+              "leftValue": "={{ $json.needsAlert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "414ef3f3-998a-4857-9a9a-20823b161e53",
+      "name": "Needs Alert?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1472,
+        592
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09GNAN8LF8",
+          "mode": "list",
+          "cachedResultName": "n8n-testing-space"
+        },
+        "text": "SSL Certificate Alert\n\nWebsite: {{ $json.originalUrl }}\nDomain: {{ $json.domain }}\nAlert Level: {{ $json.alertLevel }}\nMessage: {{ $json.alertMessage }}\nDays Left: {{ $json.daysLeft }}\nValid: {{ $json.certValid }}\nCheck Date: {{ $json.checkDate }}\n\nPlease take appropriate action to renew the SSL certificate if needed.",
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "id": "97c4979b-fe81-49f3-bdc7-7b3a121fc549",
+      "name": "Send Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1680,
+        400
+      ],
+      "typeVersion": 2.3,
+      "webhookId": "f461c296-bec9-45a8-9bf3-a59a36391d2b",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log all SSL check results for monitoring\nconst items = $input.all();\nconst logData = [];\n\nfor (const item of items) {\n  const data = item.json;\n  \n  logData.push({\n    timestamp: new Date().toISOString(),\n    domain: data.domain,\n    originalUrl: data.originalUrl,\n    alertLevel: data.alertLevel,\n    alertMessage: data.alertMessage,\n    daysLeft: data.daysLeft,\n    isValid: data.certValid,\n    needsAlert: data.needsAlert\n  });\n}\n\nconsole.log('SSL Certificate Check Results:', JSON.stringify(logData, null, 2));\n\nreturn items;"
+      },
+      "id": "4d3cfcd2-616b-4aef-b4fc-5b24faa07550",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1744,
+        608
+      ],
+      "typeVersion": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1936,
+        608
+      ],
+      "id": "2bfd6e5d-2e4a-4d3c-b050-3e8be8fee3bb",
+      "name": "Continue Domain Loop"
+    },
+    {
+      "parameters": {
+        "content": "## Workflow Overview\n\n**Purpose:** Automatically monitor SSL certificates for websites stored in an Excel file on OneDrive\n\n**Features:**\n- Reads website URLs from OneDrive Excel file\n- Checks SSL certificates using SSL-Checker.io (free)\n- Sends Slack alerts for expiring certificates\n- Runs daily at 9:00 AM\n\n**Alert Levels:**\n- 🚨 Critical: Invalid cert or expires in ≤7 days\n- ⚠️ Warning: Expires in ≤30 days\n- ℹ️ Notice: Expires in ≤60 days\n- ✅ OK: Expires in >60 days",
+        "height": 456,
+        "width": 496,
+        "color": 6
+      },
+      "id": "618e745f-f461-49ba-b51e-49ace65d5406",
+      "name": "Workflow Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        528,
+        -192
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Setup Instructions\n\n1. **OneDrive Excel File:**\n   - Create Excel file with domains in column A (header: Domain)\n   - Upload to the Security folder\n   - Update the folder ID in 'Get items in Security folder'\n\n2. **Credentials Required:**\n   - Microsoft OneDrive OAuth2\n   - Slack OAuth2 for notifications\n\n3. **Excel Format:**\n   - Column A header: Domain\n   - Values: domain only (e.g., example.com — no https://)\n\n4. **Customisation:**\n   - Adjust alert thresholds in 'Process SSL Result' node\n   - Modify Slack message template in 'Send Slack Alert'\n   - Change schedule in 'Daily SSL Check'",
+        "height": 460,
+        "width": 496,
+        "color": 7
+      },
+      "id": "6edb02d5-b7cc-4aa3-af30-0e7c056593ca",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1040,
+        -192
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 1. Data Source\n\nReads the Security folder from OneDrive, downloads all files, extracts the Excel data. Each row = one domain to check. OneDrive OAuth2 credential required.",
+        "height": 592,
+        "width": 832,
+        "color": 4
+      },
+      "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
+      "name": "Sticky Note - Data Source",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. SSL Check Loop\n\nIterates over domains one at a time. Calls ssl-checker.io for each. Process SSL Result evaluates the response and sets needsAlert, alertLevel, and daysLeft fields used by the filter.",
+        "height": 592,
+        "width": 612,
+        "color": 4
+      },
+      "id": "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f",
+      "name": "Sticky Note - SSL Check",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        816,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3. Alert & Continue\n\nCRITICAL or WARNING → Slack alert. All results logged to execution console (console.log only — not queryable). Loop continues to next domain.",
+        "height": 592,
+        "width": 656,
+        "color": 4
+      },
+      "id": "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a",
+      "name": "Sticky Note - Alert",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        288
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily SSL Check": {
+      "main": [
+        [
+          {
+            "node": "Get items in Security folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get items in Security folder": {
+      "main": [
+        [
+          {
+            "node": "Download all files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download all files": {
+      "main": [
+        [
+          {
+            "node": "Read Excel from OneDrive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Excel from OneDrive": {
+      "main": [
+        [
+          {
+            "node": "Extract Excel Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Excel Data": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Domains": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Check SSL Certificate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check SSL Certificate": {
+      "main": [
+        [
+          {
+            "node": "Process SSL Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process SSL Result": {
+      "main": [
+        [
+          {
+            "node": "Needs Alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Alert?": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Slack Alert": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Results": {
+      "main": [
+        [
+          {
+            "node": "Continue Domain Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue Domain Loop": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Loop Over Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "2c239633-6568-4a74-8192-ff4e250db69d",
+  "meta": {
+    "instanceId": "956b0642caa17694415befab574421a5ea4e33d80484849229d4837d84bb9058"
+  },
+  "id": "jJbBOkGRGhbIgDRw",
+  "tags": []
+}
